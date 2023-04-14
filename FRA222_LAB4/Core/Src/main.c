@@ -47,19 +47,21 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+// Motor Variables
 uint32_t QEIReadRaw;
-float duty;
 uint8_t motorDirection = 0; // 1 = CW, 0 = CCW
-float targetPosition = 0;
-float actualPosition;
-uint16_t flag = 0;
-float checkNum = 0;
+uint8_t flag = 0;
+float duty;
 // PID Variables
 float kp = 10;
 float ki = 0.0002;
 float deltaT = 0.005;
 float eintegral = 0;
-float Position = 0;
+
+// Position Variables
+float targetPosition = 0;
+float actualPosition;
+float gTargetPosition = 0;
 float errorPosition = 0;
 /* USER CODE END PV */
 
@@ -138,8 +140,8 @@ int main(void)
 			timestamp = HAL_GetTick() + 5;
 
 			actualPosition = QEIReadRaw + (61440*(flag-1));
-			Position = targetPosition * 8.5333;
-			errorPosition = (Position) - actualPosition;
+			gTargetPosition = targetPosition * 8.5333;
+			errorPosition = gTargetPosition - actualPosition;
 			duty = controllerPID(errorPosition);
 
 			if (duty < 0) {
@@ -171,7 +173,6 @@ int main(void)
 				}
 				setMotorCCW();
 			}
-
 
 
 		}
@@ -480,14 +481,14 @@ int _write(int file, char *ptr, int len) {
 	return len;
 }
 
+// controller
 float controllerPID(float errorDiff) {
 	eintegral = eintegral + (errorDiff * deltaT);
 	float u = (kp * errorDiff) + (ki * eintegral);
-	checkNum = u;
 	return u;
 }
 
-//timer call back
+// timer call back
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
 		// QEI
@@ -502,11 +503,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	}
 }
 
+// motor CW
 void setMotorCW() {
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
 }
-
+// motor CCW
 void setMotorCCW() {
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
