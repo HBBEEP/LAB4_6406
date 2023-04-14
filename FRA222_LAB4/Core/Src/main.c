@@ -137,35 +137,37 @@ int main(void)
 		if (HAL_GetTick() > timestamp) {
 			timestamp = HAL_GetTick() + 5;
 
-			actualPosition = QEIReadRaw;
+			actualPosition = QEIReadRaw + (61440*(flag-1));
 			Position = targetPosition * 8.5333;
 			errorPosition = (Position) - actualPosition;
 			duty = controllerPID(errorPosition);
 
 			if (duty < 0) {
-				motorDirection = 0;
+				motorDirection = 1;
 				duty = (-1) * duty;
 				if (duty >= 1000)
 				{
 					duty = 1000;
 				}
 
-				if (duty <= 80)
+				if (duty <= 90)
 				{
 					duty = 0;
+					eintegral = 0;
 				}
 				setMotorCW();
 
 			} else {
-				motorDirection = 1;
+				motorDirection = 0;
 				if (duty >= 1000)
 				{
 					duty = 1000;
 				}
 
-				if (duty <= 50)
+				if (duty <= 90)
 				{
 					duty = 0;
+					eintegral = 0;
 				}
 				setMotorCCW();
 			}
