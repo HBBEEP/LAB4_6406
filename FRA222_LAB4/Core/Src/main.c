@@ -48,15 +48,15 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 uint32_t QEIReadRaw;
-uint32_t duty;
+float duty;
 uint8_t motorDirection = 0; // 1 = CW, 0 = CCW
 float targetPosition = 0;
 float actualPosition;
-uint16_t flag = 1;
+uint16_t flag = 0;
 float checkNum = 0;
 // PID Variables
-float kp = 8;
-float ki = 0.005;
+float kp = 10;
+float ki = 0.0002;
 float deltaT = 0.005;
 float eintegral = 0;
 float Position = 0;
@@ -137,41 +137,40 @@ int main(void)
 		if (HAL_GetTick() > timestamp) {
 			timestamp = HAL_GetTick() + 5;
 
-			//actualPosition = (QEIReadRaw * (3072 / 360)) * (flag + 1);
 			actualPosition = QEIReadRaw;
 			Position = targetPosition * 8.5333;
 			errorPosition = (Position) - actualPosition;
 			duty = controllerPID(errorPosition);
 
-			// motor duty
-//			if (duty > 1000) {
-//				duty = 1000;
-//			}
-//			else if (duty < 0)
-//			{
-//				duty = 0;
-//			}
-//			if (motorDirection)
-//			{
-//				setMotorCCW();
-//
-//			}
-//			else{
-//				setMotorCW();
-//
-//			}
-
 			if (duty < 0) {
-				//motorDirection = 0;
+				motorDirection = 0;
 				duty = (-1) * duty;
+				if (duty >= 1000)
+				{
+					duty = 1000;
+				}
+
+				if (duty <= 80)
+				{
+					duty = 0;
+				}
 				setMotorCW();
 
 			} else {
-				//motorDirection = 1;
-				//duty = 1000 - duty;
-				setMotorCCW();
+				motorDirection = 1;
+				if (duty >= 1000)
+				{
+					duty = 1000;
+				}
 
+				if (duty <= 50)
+				{
+					duty = 0;
+				}
+				setMotorCCW();
 			}
+
+
 
 		}
 
@@ -493,7 +492,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim3);
 	}
 	if (htim == &htim3) {
-		if (motorDirection) {
+		if (!motorDirection) {
 			flag += 1;
 		} else {
 			flag -= 1;
@@ -504,13 +503,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 void setMotorCW() {
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
-	//HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, 0);
 }
 
 void setMotorCCW() {
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
-
 }
 /* USER CODE END 4 */
 
