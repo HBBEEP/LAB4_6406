@@ -142,7 +142,15 @@ int main(void)
 			actualPosition = QEIReadRaw + (61440*(flag-1));
 			gTargetPosition = targetPosition * 8.5333;
 			errorPosition = gTargetPosition - actualPosition;
-			duty = controllerPID(errorPosition);
+			if (targetPosition <= 36000)
+			{
+				duty = controllerPID(errorPosition);
+			}
+			else
+			{
+				duty = 0;
+				eintegral = 0;
+			}
 
 			if (duty < 0) {
 				motorDirection = 1;
@@ -152,7 +160,7 @@ int main(void)
 					duty = 1000;
 				}
 
-				if (duty <= 90)
+				if (duty <= 110)
 				{
 					duty = 0;
 					eintegral = 0;
@@ -166,7 +174,7 @@ int main(void)
 					duty = 1000;
 				}
 
-				if (duty <= 90)
+				if (duty <= 110)
 				{
 					duty = 0;
 					eintegral = 0;
