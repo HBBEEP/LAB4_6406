@@ -42,7 +42,6 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim5;
 
 UART_HandleTypeDef huart2;
@@ -50,13 +49,12 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 // Motor Variables
 int32_t QEIReadRaw;
-uint8_t motorDirection = 0; // 1 = CW, 0 = CCW
-uint8_t flag = 0;
+uint8_t motorDirection = 0; // 1 = CCW, 0 = CW
 float duty;
 // PID Variables
 float kp = 10;
 float ki = 0.0002;
-float deltaT = 0.005;
+float deltaT = 0.001;
 float eintegral = 0;
 
 // Position Variables
@@ -71,15 +69,12 @@ float gActualPosition;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
-float controllerPID(float errorDiff);
-void setMotorCW();
-void setMotorCCW();
-
+void controllerPID();
+void setMotor();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -116,14 +111,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_TIM3_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-	//HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_1 | TIM_CHANNEL_2);
-	//HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_1 | TIM_CHANNEL_2);
-
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_1 | TIM_CHANNEL_2);
 	HAL_TIM_Encoder_Start(&htim5, TIM_CHANNEL_1 | TIM_CHANNEL_2);
 
@@ -132,7 +123,6 @@ int main(void)
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 
 	HAL_TIM_Base_Start_IT(&htim2);
-	HAL_TIM_Base_Start_IT(&htim3);
 
   /* USER CODE END 2 */
 
@@ -142,57 +132,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-		static uint32_t timestamp = 0;
-		if (HAL_GetTick() > timestamp) {
-			timestamp = HAL_GetTick() + 5;
-
-			actualPosition = QEIReadRaw + (61440*(flag-1));
-			gTargetPosition = targetPosition * 8.5333;
-			errorPosition = gTargetPosition - actualPosition;
-			gActualPosition = actualPosition / 8.5333;
-			if (targetPosition <= 36000)
-			{
-				duty = controllerPID(errorPosition);
-			}
-			else
-			{
-				duty = 0;
-				eintegral = 0;
-			}
-
-			if (duty < 0) {
-				motorDirection = 1;
-				duty = (-1) * duty;
-				if (duty >= 1000)
-				{
-					duty = 1000;
-				}
-
-				if (duty <= 90)
-				{
-					duty = 0;
-					eintegral = 0;
-				}
-				setMotorCW();
-
-			} else {
-				motorDirection = 0;
-				if (duty >= 1000)
-				{
-					duty = 1000;
-				}
-
-				if (duty <= 90)
-				{
-					duty = 0;
-					eintegral = 0;
-				}
-				setMotorCCW();
-			}
-
-
-		}
 
 	}
   /* USER CODE END 3 */
@@ -369,55 +308,6 @@ static void MX_TIM2_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM3_Init(void)
-{
-
-  /* USER CODE BEGIN TIM3_Init 0 */
-
-  /* USER CODE END TIM3_Init 0 */
-
-  TIM_Encoder_InitTypeDef sConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM3_Init 1 */
-
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = QEI_PERIOD-1;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  sConfig.EncoderMode = TIM_ENCODERMODE_TI12;
-  sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 0;
-  sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
-  sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
-  sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 0;
-  if (HAL_TIM_Encoder_Init(&htim3, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM3_Init 2 */
-
-  /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
   * @brief TIM5 Initialization Function
   * @param None
   * @retval None
@@ -547,37 +437,58 @@ int _write(int file, char *ptr, int len) {
 	return len;
 }
 
-// controller
-float controllerPID(float errorDiff) {
-	eintegral = eintegral + (errorDiff * deltaT);
-	float u = (kp * errorDiff) + (ki * eintegral);
-	return u;
-}
-
 // timer call back
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim2) {
 		// QEI
 		QEIReadRaw = __HAL_TIM_GET_COUNTER(&htim5);
+		controllerPID();
 	}
-	if (htim == &htim3) {
-		if (!motorDirection) {
-			flag += 1;
-		} else {
-			flag -= 1;
-		}
+
+}
+
+void setMotor() {
+	if (motorDirection) // motor CW
+	{
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
+	} else // motor CCW
+	{
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
 	}
 }
 
-// motor CW
-void setMotorCW() {
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty);
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
-}
-// motor CCW
-void setMotorCCW() {
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
-	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, duty);
+// controller
+void controllerPID() {
+	actualPosition = QEIReadRaw;
+	gTargetPosition = targetPosition * 8.5333;
+	errorPosition = gTargetPosition - actualPosition;
+	gActualPosition = actualPosition / 8.5333;
+	if (targetPosition <= 36000 && targetPosition >= 0) {
+		eintegral = eintegral + (errorPosition * deltaT);
+		duty = (kp * errorPosition) + (ki * eintegral);
+		if (duty < 0) {
+			motorDirection = 1;
+			duty = (-1) * duty;
+		} else {
+			motorDirection = 0;
+		}
+
+		if (duty >= 1000) {
+			duty = 1000;
+		}
+
+		if (duty <= 90) {
+			duty = 0;
+			eintegral = 0;
+		}
+		setMotor();
+	} else {
+		duty = 0;
+		eintegral = 0;
+	}
+
 }
 /* USER CODE END 4 */
 
