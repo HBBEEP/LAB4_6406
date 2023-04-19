@@ -53,10 +53,11 @@ uint8_t motorDirection = 0; // 1 = CCW, 0 = CW
 float duty;
 // PID Variables
 float kp = 10;
-float ki = 0.0002;
+float ki = 0.00029;
+float kd = 0.001;
 float deltaT = 0.001;
 float eintegral = 0;
-
+float errorPrevious = 0;
 // Position Variables
 float targetPosition = 0;
 float actualPosition;
@@ -466,8 +467,10 @@ void controllerPID() {
 	errorPosition = gTargetPosition - actualPosition;
 	gActualPosition = actualPosition / 8.5333;
 	if (targetPosition <= 36000 && targetPosition >= 0) {
+		float dedt = (errorPosition-errorPrevious)/ deltaT;
 		eintegral = eintegral + (errorPosition * deltaT);
-		duty = (kp * errorPosition) + (ki * eintegral);
+		errorPrevious = errorPosition;
+		duty = (kp * errorPosition) + (ki * eintegral)+ (kd * dedt);
 		if (duty < 0) {
 			motorDirection = 1;
 			duty = (-1) * duty;
